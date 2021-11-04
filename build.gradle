@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.1.0'
+}
+
+
+sourceCompatibility = targetCompatibility = 1.8
+compileJava.options.encoding = 'UTF-8'
+
+group 'fr.benco11'
+version '1.0.0'
+
+archivesBaseName = "Urne"
+mainClassName = "fr.benco11.urne.Urne"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.javacord:javacord:3.3.2'
+    implementation 'me.carleslc.Simple-YAML:Simple-Yaml:1.7.2'
+}
+
+shadowJar {
+    project.configurations.implementation.canBeResolved(true)
+    configurations = [project.configurations.implementation]
+}
