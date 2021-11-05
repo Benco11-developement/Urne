@@ -4,7 +4,6 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '7.1.0'
 }
 
-
 sourceCompatibility = targetCompatibility = 1.8
 compileJava.options.encoding = 'UTF-8'
 
@@ -16,11 +15,16 @@ mainClassName = "fr.benco11.urne.Urne"
 
 repositories {
     mavenCentral()
+    maven {
+        url 'https://jitpack.io'
+    }
 }
 
 dependencies {
     implementation 'org.javacord:javacord:3.3.2'
     implementation 'me.carleslc.Simple-YAML:Simple-Yaml:1.7.2'
+    implementation 'org.fusesource.jansi:jansi:2.4.0'
+    implementation 'org.xerial:sqlite-jdbc:3.36.0.2'
 }
 
 shadowJar {
