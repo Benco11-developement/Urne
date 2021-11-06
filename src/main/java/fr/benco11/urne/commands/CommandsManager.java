@@ -27,7 +27,7 @@ public class CommandsManager {
         commands.stream().filter(a -> a.getName().equals(commandName)).findAny().ifPresent(a -> a.run(event));
     }
 
-    public void unregisterInvalidCommands(List<SlashCommand> commands, DiscordApi api) {
+    public void unregisterInvalidCommands(List<SlashCommand> commands) {
         commands.stream().filter(a -> !commands.stream().anyMatch(b -> a.getName().equals(b.getName()))).forEach(a -> a.deleteGlobal().join());
     }
 }

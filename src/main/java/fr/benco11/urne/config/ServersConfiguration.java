@@ -22,11 +22,12 @@ public class ServersConfiguration {
                 "                            vote_models TEXT(150)\n"+
                 "                        );", false).join();
         database.update(
-                "CREATE TABLE IF NOT EXISTS votes(\n"+
+                "CREATE TABLE IF NOT EXISTS polls(\n"+
                         "                            name VARCHAR(30) PRIMARY KEY UNIQUE NOT NULL,\n" +
-                        "                            vote_message_id BIGINT NOT NULL,\n"+
+                        "                            poll_message_id BIGINT NOT NULL,\n"+
                         "                            use_urn BOOLEAN NOT NULL,\n"+
                         "                            public_vote BOOLEAN NOT NULL,\n"+
+                        "                            poll_end_date DATETIME NOT NULL,\n" +
                         "                            votes TEXT\n" +
                         "                        );", false).join();
 

@@ -1,6 +1,8 @@
 package fr.benco11.urne.commands;
 
 import fr.benco11.urne.config.ServersConfiguration;
+import org.javacord.api.entity.channel.Channel;
+import org.javacord.api.entity.channel.ServerChannel;
 import org.javacord.api.entity.message.embed.EmbedBuilder;
 import org.javacord.api.event.interaction.SlashCommandCreateEvent;
 import org.javacord.api.interaction.*;
@@ -38,12 +40,15 @@ public class CommandChannelUrne implements Command {
                 serversConfig.updateServerUrnChannel(inter.getServer().get().getId(),
                         inter.getFirstOption().get().getFirstOptionChannelValue().get().getId()).thenAccept(result -> {
                             builder.setColor((result) == 1 ? Color.GREEN : Color.RED).setTitle((result == 1) ? "Succès" : "Erreur")
-                                    .setFooter((result == 1) ? "Le channel d'urne a bien été modifié !" : "Une erreur s'est produite !");
+                                    .setFooter((result == 1) ? "Le channel d'urne est à présent le channel : " + inter.getFirstOption().get().getFirstOptionChannelValue().flatMap(Channel::asServerChannel).get().getName() : "Une erreur s'est produite !");
                             interaction.update();
                         }).join();
             } else {
-                serversConfig.getServerUrnChannel(inter.getServer().get().getId()).thenAccept(a -> builder.setTitle("").setColor((a == 0) ? Color.ORANGE : Color.GREEN)
-                        .setFooter((a == 0) ? "Impossible de déterminer le channel d'urne !" : "Le channel d'urne est : " + event.getSlashCommandInteraction().getChannel().get().asServerChannel().get().getName() + "")).thenApply(a -> interaction.update()).join();
+                serversConfig.getServerUrnChannel(inter.getServer().get().getId()).thenAccept(a -> {
+                    ServerChannel urnChannel;
+                    builder.setTitle("").setColor((a == 0) ? Color.ORANGE : Color.GREEN)
+                            .setFooter((a == 0 || (urnChannel = event.getApi().getServerChannelById(a).orElse(null)) == null) ? "Impossible de déterminer le channel d'urne !" : "Le channel d'urne est : " + urnChannel.getName());
+                }).thenApply(a -> interaction.update()).join();
             }
 
         });
