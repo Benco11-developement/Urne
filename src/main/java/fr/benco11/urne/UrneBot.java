@@ -47,7 +47,7 @@ public class UrneBot {
         votingSystems.add(new AbsoluteMajority());
         api = new DiscordApiBuilder().setToken(botConfig.getToken()).login().join();
         commandsManager.addCommand(new CommandChannelUrne(serversConfig));
-        commandsManager.addCommand(new CommandVote(votingSystems));
+        commandsManager.addCommand(new CommandVote(votingSystems, serversConfig));
         try {
             api.getGlobalSlashCommands().thenAccept(commandsManager::unregisterInvalidCommands).get();
         } catch(InterruptedException | ExecutionException e) {

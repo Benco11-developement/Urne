@@ -1,20 +1,28 @@
 package fr.benco11.urne.commands;
 
+import fr.benco11.urne.config.ServersConfiguration;
 import fr.benco11.urne.vote.VotingSystem;
+import org.javacord.api.entity.message.MessageBuilder;
+import org.javacord.api.entity.message.MessageFlag;
+import org.javacord.api.entity.message.embed.EmbedBuilder;
 import org.javacord.api.event.interaction.SlashCommandCreateEvent;
 import org.javacord.api.interaction.*;
 
+import java.awt.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class CommandVote implements Command {
 
     private final List<VotingSystem> votingSystems;
+    private final ServersConfiguration serversConfig;
 
-    public CommandVote(List<VotingSystem> votingSystems) {
+    public CommandVote(List<VotingSystem> votingSystems, ServersConfiguration serversConfig) {
         this.votingSystems = votingSystems;
+        this.serversConfig = serversConfig;
     }
 
     @Override
@@ -29,6 +37,9 @@ public class CommandVote implements Command {
                         SlashCommandOption.create(SlashCommandOptionType.STRING, "poll-name", "Nom du vote", true),
                         SlashCommandOption.create(SlashCommandOptionType.STRING, "vote", "Vote suivant le mode de scrutin", true)
                 )),
+                SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "get", "Renvoie un vote au choix", Collections.singletonList(
+                        SlashCommandOption.create(SlashCommandOptionType.STRING, "poll-name", "Nom du vote")
+                )),
                 SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "poll", "Commence un vote configuré manuellement", Arrays.asList(
                         SlashCommandOption.create(SlashCommandOptionType.STRING, "poll-name", "Nom du vote", true),
                         SlashCommandOption.createWithChoices(SlashCommandOptionType.STRING, "voting-system","Mode de scrutin", true,
@@ -36,11 +47,11 @@ public class CommandVote implements Command {
                         SlashCommandOption.create(SlashCommandOptionType.BOOLEAN, "public-vote", "Si le vote de chaque personne est public ou non", true),
                         SlashCommandOption.create(SlashCommandOptionType.BOOLEAN, "use-urn", "Si le vote se fait par urne, sinon par réactions", true),
                         SlashCommandOption.create(SlashCommandOptionType.STRING, "poll-end", "Date de fin du vote avec le format : dd-MM-yyyy;hh:mm:ss", true),
-                        SlashCommandOption.create(SlashCommandOptionType.INTEGER, "template-message-id", "Message modèle que le bot utilisera lors de l'annonce du vote", false),
-                        SlashCommandOption.create(SlashCommandOptionType.STRING, "proposals", "Liste des différentes propositions sous la forme : prop1;prop2;prop3", true)
+                        SlashCommandOption.create(SlashCommandOptionType.STRING, "proposals", "Différentes propositions avec le format : prop1;prop2;prop3", true),
+                        SlashCommandOption.create(SlashCommandOptionType.INTEGER, "template-message-id", "ID du message modèle que le bot utilisera lors de l'annonce du vote", false)
                 )),
                 SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "poll-model", "Commence un vote suivant un modèle", Arrays.asList(
-                        SlashCommandOption.create(SlashCommandOptionType.STRING, "model", "Modèle utilisé", true),
+                        SlashCommandOption.create(SlashCommandOptionType.STRING, "model", "Modèle à utiliser", true),
                         SlashCommandOption.create(SlashCommandOptionType.STRING, "poll-name", "Nom du vote", true),
                         SlashCommandOption.create(SlashCommandOptionType.STRING, "poll-end", "Date de fin du vote avec le format : dd-MM-yyyy;hh:mm:ss", true)
                 )),
@@ -53,15 +64,62 @@ public class CommandVote implements Command {
                         SlashCommandOption.create(SlashCommandOptionType.INTEGER, "template-message-id", "Message modèle que le bot utilisera lors de l'annonce du vote", false)
                 )),
                 SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "delete-model", "Supprime un modèle de vote", Collections.singletonList(
-                        SlashCommandOption.create(SlashCommandOptionType.STRING, "model", "Modèle à supprimer")
+                        SlashCommandOption.create(SlashCommandOptionType.STRING, "model", "Modèle à supprimer", true)
                 )),
                 SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "end-poll", "Annule un vote (seul un administrateur du bot peut exécuter cette commande)", Collections.singletonList(
-                        SlashCommandOption.create(SlashCommandOptionType.STRING, "poll", "Vote à annuler")
+                        SlashCommandOption.create(SlashCommandOptionType.STRING, "poll", "Vote à annuler", true)
                 ))));
     }
 
     @Override
     public void run(SlashCommandCreateEvent event) {
-
+            SlashCommandInteractionOption firstOption = event.getSlashCommandInteraction().getFirstOption().get();
+            switch(firstOption.getName()) {
+                case "for":
+                    switch(serversConfig.vote(event.getInteraction().getUser().getId(), firstOption.getFirstOptionStringValue().get(),
+                            firstOption.getSecondOptionStringValue().get()).join()) {
+                        case -1:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Erreur").setFooter("Une erreur s'est produite !\nVeuillez vérifier le nom du vote et le format de votre vote puis réessayez !")
+                                    .setColor(Color.RED)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                        case 0:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Erreur").setFooter("Une erreur s'est produite avec la base de donnée ! Veuillez contacter l'administrateur du bot !")
+                                    .setColor(Color.RED)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                        case 1:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Erreur").setFooter("Une erreur s'est produite lors de la mise à jour de votre vote !")
+                                    .setColor(Color.RED)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                        case 2:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Succès").setFooter("Votre vote a bien été mis à jour et comptabilisé !")
+                                    .setColor(Color.GREEN)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                    }
+                    break;
+                case "get":
+                    Map.Entry<Byte, String> vote = serversConfig.getVote(event.getInteraction().getUser().getId(), firstOption.getFirstOptionStringValue().get()).join();
+                    switch(vote.getKey()) {
+                        case -1:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Erreur").setFooter("Une erreur s'est produite !\nVeuillez vérifier le nom du vote !")
+                                    .setColor(Color.RED)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                        case 0:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Erreur").setFooter("Une erreur s'est produite avec la base de donnée ! Veuillez contacter l'administrateur du bot !")
+                                    .setColor(Color.RED)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                        case 1:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Erreur").setFooter("Une erreur s'est produite, votre vote n'a pas été trouvé ! Avez-vous voté ?")
+                                    .setColor(Color.ORANGE)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                        case 2:
+                            event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Succès").setFooter("Voici votre vote " + vote.getValue())
+                                    .setColor(Color.GREEN)).setFlags(MessageFlag.EPHEMERAL).respond();
+                            break;
+                    }
+                    break;
+                default:
+                    event.getSlashCommandInteraction().createImmediateResponder().addEmbed(new EmbedBuilder().setTitle("Commande non-implémentée !")).setFlags(MessageFlag.EPHEMERAL).respond();
+                    break;
+            }
     }
 }

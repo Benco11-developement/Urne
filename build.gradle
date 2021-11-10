@@ -24,6 +24,8 @@ dependencies {
     implementation 'org.javacord:javacord:3.3.2'
     implementation 'me.carleslc.Simple-YAML:Simple-Yaml:1.7.2'
     implementation 'org.xerial:sqlite-jdbc:3.36.0.2'
+    implementation 'org.jetbrains:annotations:22.0.0'
+    implementation 'com.password4j:password4j:1.5.3'
 }
 
 shadowJar {

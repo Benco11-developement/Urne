@@ -1,9 +1,12 @@
 package fr.benco11.urne.database;
 
+import org.sqlite.Function;
+
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 
 public class Database {
     private Connection connection;
@@ -45,6 +48,27 @@ public class Database {
                 return -1;
             }
         });
+    }
+
+    public void initFunctions() {
+        try {
+            Function.create(connection, "REGEXP", new Function() {
+                @Override
+                protected void xFunc() throws SQLException {
+                    String expression = value_text(0);
+                    String value = value_text(1);
+                    if (value == null)
+                        value = "";
+
+                    Pattern pattern = Pattern.compile(expression);
+                    result(pattern.matcher(value).find() ? 1 : 0);
+                }
+            });
+        } catch(SQLException e) {
+            System.err.println("Une erreur fatale s'est produite : ");
+            e.printStackTrace();
+            System.exit(0);
+        }
     }
 
 }

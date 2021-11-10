@@ -20,14 +20,14 @@ public class CommandsManager {
     }
 
     public void registerCommands(DiscordApi api) {
-        api.bulkOverwriteGlobalSlashCommands(commands.stream().map(Command::getSlashCommandBuilder).collect(Collectors.toList()));
+        api.bulkOverwriteGlobalSlashCommands(commands.stream().map(Command::getSlashCommandBuilder).collect(Collectors.toList())).join();
     }
 
     public void runCommand(String commandName, SlashCommandCreateEvent event) {
         commands.stream().filter(a -> a.getName().equals(commandName)).findAny().ifPresent(a -> a.run(event));
     }
 
-    public void unregisterInvalidCommands(List<SlashCommand> commands) {
+    public void unregisterInvalidCommands(@org.jetbrains.annotations.NotNull List<SlashCommand> commands) {
         commands.stream().filter(a -> !commands.stream().anyMatch(b -> a.getName().equals(b.getName()))).forEach(a -> a.deleteGlobal().join());
     }
 }
