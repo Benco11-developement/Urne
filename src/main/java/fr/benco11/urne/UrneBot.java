@@ -1,6 +1,6 @@
 package fr.benco11.urne;
 
-import fr.benco11.urne.commands.CommandChannelUrne;
+
 import fr.benco11.urne.commands.CommandVote;
 import fr.benco11.urne.commands.CommandsManager;
 import fr.benco11.urne.config.ServersConfiguration;
@@ -12,16 +12,20 @@ import org.javacord.api.DiscordApiBuilder;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 public class UrneBot {
-    private UrneConfiguration botConfig;
+    private final UrneConfiguration botConfig;
     private ServersConfiguration serversConfig;
-    private CommandsManager commandsManager;
+    private final CommandsManager commandsManager;
     private DiscordApi api;
     private final List<VotingSystem> votingSystems;
+    private final ScheduledExecutorService executor;
+    private final Map<String, ScheduledFuture<?>> voteCount;
 
     public UrneBot(UrneConfiguration botConfig) {
         this.botConfig = botConfig;
@@ -35,6 +39,8 @@ public class UrneBot {
         }
         commandsManager = new CommandsManager();
         votingSystems = new ArrayList<>();
+        voteCount = new HashMap<>();
+        executor = Executors.newScheduledThreadPool(5);
     }
 
     public void init() {
@@ -46,8 +52,7 @@ public class UrneBot {
         }
         votingSystems.add(new AbsoluteMajority());
         api = new DiscordApiBuilder().setToken(botConfig.getToken()).login().join();
-        commandsManager.addCommand(new CommandChannelUrne(serversConfig));
-        commandsManager.addCommand(new CommandVote(votingSystems, serversConfig));
+        commandsManager.addCommand(new CommandVote(votingSystems, serversConfig, this));
         try {
             api.getGlobalSlashCommands().thenAccept(commandsManager::unregisterInvalidCommands).get();
         } catch(InterruptedException | ExecutionException e) {
@@ -56,5 +61,21 @@ public class UrneBot {
         }
         commandsManager.registerCommands(api);
         api.addSlashCommandCreateListener(event -> commandsManager.runCommand(event.getSlashCommandInteraction().getCommandName(), event));
+    }
+
+    public void scheduleVoteCount(Date pollEnd, String pollName, VotingSystem votingSystem, Consumer<String> result) {
+        voteCount.put(pollName, executor.schedule(() -> {
+            result.accept(serversConfig.getVotes(pollName).thenApply(votingSystem::voteResult).join());
+            voteCount.remove(pollName);
+        }, Duration.between(Instant.now(), pollEnd.toInstant()).getSeconds(), TimeUnit.SECONDS));
+    }
+
+    public void cancelVoteCount(String pollName, Runnable r) {
+        ScheduledFuture<?> future;
+        if((future = voteCount.getOrDefault(pollName, null)) != null) {
+            future.cancel(false);
+            voteCount.remove(pollName);
+            r.run();
+        }
     }
 }

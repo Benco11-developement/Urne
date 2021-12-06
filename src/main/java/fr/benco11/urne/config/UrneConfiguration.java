@@ -5,11 +5,12 @@ import org.simpleyaml.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class UrneConfiguration {
-    public static final YamlConfiguration CONFIG_TEMPLATE = YamlConfiguration.loadConfiguration(UrneConfiguration.class.getResourceAsStream("/config.yml"));
+    public static final YamlConfiguration CONFIG_TEMPLATE = YamlConfiguration.loadConfiguration(Objects.requireNonNull(UrneConfiguration.class.getResourceAsStream("/config.yml")));
 
     private final YamlConfiguration config;
     private final String token;
@@ -28,7 +29,7 @@ public class UrneConfiguration {
     }
 
 
-    public static final UrneConfiguration loadConfiguration() {
+    public static UrneConfiguration loadConfiguration() {
         File configFile = new File(System.getProperty("user.dir"), "config.yml");
         if(configFile.exists()) {
             YamlConfiguration yamlConfig = YamlConfiguration.loadConfiguration(configFile);

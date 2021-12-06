@@ -2,14 +2,13 @@ package fr.benco11.urne.config;
 
 import com.password4j.Password;
 import fr.benco11.urne.database.Database;
+import fr.benco11.urne.vote.Vote;
 import fr.benco11.urne.vote.VotingSystem;
 
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.AbstractMap;
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 public class ServersConfiguration {
@@ -24,16 +23,17 @@ public class ServersConfiguration {
         database.update(
                 "CREATE TABLE IF NOT EXISTS servers(\n"+
                 "                            server_id BIGINT PRIMARY KEY UNIQUE NOT NULL,\n"+
-                "                            urn_channel BIGINT,\n"+
                 "                            vote_models TEXT(150)\n"+
                 "                        );", false).join();
         database.update(
                 "CREATE TABLE IF NOT EXISTS polls(\n"+
                         "                            name VARCHAR(30) PRIMARY KEY UNIQUE NOT NULL,\n" +
                         "                            use_urn BOOLEAN NOT NULL,\n"+
+                        "                            urn_channel BIGINT,\n" +
                         "                            public_vote BOOLEAN NOT NULL,\n"+
-                        "                            poll_end_date DATETIME NOT NULL\n," +
-                        "                            proposals TEXT(160) NOT NULL\n" +
+                        "                            poll_end_date DATETIME NOT NULL,\n" +
+                        "                            proposals TEXT(500) NOT NULL,\n" +
+                        "                            proposals_regex TEXT(550) NOT NULL\n" +
                         "                        );", false).join();
         database.update(
                 "CREATE TABLE IF NOT EXISTS votes(\n"+
@@ -43,30 +43,11 @@ public class ServersConfiguration {
 
     }
 
-    public CompletableFuture<Integer> updateServerUrnChannel(long serverId, long channelId) {
-        return database.update("INSERT INTO servers(server_id, urn_channel, vote_models) VALUES(?, ?, '') ON CONFLICT(server_id) DO UPDATE SET urn_channel = ?", false,
-                serverId, channelId, channelId);
-    }
-
-    public CompletableFuture<Long> getServerUrnChannel(long serverId) {
-        return CompletableFuture.supplyAsync(() -> {
-            long value = 0L;
-            try(ResultSet result = database.query(database.preparedStatement("SELECT urn_channel FROM servers WHERE server_id = ?", serverId)).join()) {
-                if(result.next()) {
-                    value = result.getLong("urn_channel");
-                }
-            } catch(SQLException e) {
-                e.printStackTrace();
-            }
-            return value;
-        });
-    }
-
     public CompletableFuture<Byte> vote(long authorId, String poll, String votedProposal) {
         return CompletableFuture.supplyAsync(() -> {
             String key = poll + "\t" +Password.hash(Long.toHexString(authorId)).withBCrypt().getResult();
             byte value = 0;
-            try(ResultSet resultPollCheck = database.query(database.preparedStatement("SELECT name FROM polls WHERE name = ? AND ? REGEXP proposals", poll, votedProposal)).join()) {
+            try(ResultSet resultPollCheck = database.query(database.preparedStatement("SELECT name FROM polls WHERE name = ? AND ? REGEXP proposals_regex", poll, votedProposal)).join()) {
                 if(resultPollCheck.next()) {
                     value = 1;
                     database.update("INSERT INTO votes(key, voted_proposal) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET voted_proposal = ?",
@@ -108,9 +89,26 @@ public class ServersConfiguration {
 
     public CompletableFuture<Byte> startVote(String pollName, VotingSystem votingSystem, boolean isVotePublic, boolean doUseUrn, Date pollEnd, String proposals) {
         return CompletableFuture.supplyAsync(() -> {
+            List<String> proposalsList = votingSystem.formatProposals(proposals);
+            if(proposalsList.size() > 25) return (byte) -2;
             if(pollName.length() > 30) return (byte) -1;
-            return (byte) ((database.update("INSERT INTO polls(name, use_urn, public-vote, poll_end_date, proposals) VALUES(?, ?, ?, ?, ?)", false,
-                    pollName, doUseUrn, isVotePublic, pollEnd, votingSystem.proposalFormattedToRegex(votingSystem.formatProposals(proposals))).join()) > -1 ? 1 : 0);
+            return (byte) ((database.update("INSERT or IGNORE INTO polls(name, use_urn, public_vote, poll_end_date, proposals, proposals_regex) VALUES(?, ?, ?, ?, ?, ?)", false,
+                    pollName, doUseUrn, isVotePublic, pollEnd, proposals, votingSystem.proposalFormattedToRegex(proposalsList)).join()) > -1 ? 1 : 0);
+        });
+    }
+
+    public CompletableFuture<List<Vote>> getVotes(String pollName) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                List<Vote> result = new ArrayList<>();
+                try(ResultSet r = database.query(database.preparedStatement("SELECT voted_proposal FROM votes WHERE key LIKE ?", pollName + "%")).join()) {
+                    while(r.next()) result.add(Vote.getVote(r.getNString("voted_proposal"), pollName));
+                }
+                return result;
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+            return null;
         });
     }
 }
